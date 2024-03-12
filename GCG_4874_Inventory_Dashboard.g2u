@@ -1,0 +1,347 @@
+Program.Sub.ScreenSU.Start
+Gui.Form..Create
+Gui.Form..Caption("Inventory")
+Gui.Form..Size(15360,10695)
+Gui.Form..MinX(0)
+Gui.Form..MinY(0)
+Gui.Form..Position(0,0)
+Gui.Form..BackColor(-2147483633)
+Gui.Form..MousePointer(0)
+Gui.Form..Event(UnLoad,Form_UnLoad)
+Gui.Form.GsGrid.Create(GsGridControl)
+Gui.Form.GsGrid.Size(15300,8970)
+Gui.Form.GsGrid.Position(-45,1185)
+Gui.Form.GsGrid.Event(CellValueChanged,GsGrid_CellValueChanged)
+Gui.Form.dtpFrom.Create(DatePicker)
+Gui.Form.dtpFrom.Size(1935,285)
+Gui.Form.dtpFrom.Position(105,345)
+Gui.Form.dtpTo.Create(DatePicker)
+Gui.Form.dtpTo.Size(1935,285)
+Gui.Form.dtpTo.Position(2340,345)
+Gui.Form.cmdSave.Create(Button)
+Gui.Form.cmdSave.Size(855,375)
+Gui.Form.cmdSave.Position(13965,375)
+Gui.Form.cmdSave.Caption("Save")
+Gui.Form.cmdSave.Event(Click,cmdSave_Click)
+Gui.Form.chk1.Create(CheckBox)
+Gui.Form.chk1.Size(1365,360)
+Gui.Form.chk1.Position(135,735)
+Gui.Form.chk1.Caption("All Dates")
+Gui.Form.Data.Create(Button)
+Gui.Form.Data.Size(855,375)
+Gui.Form.Data.Position(2850,705)
+Gui.Form.Data.Caption("Refresh")
+Gui.Form.Data.Event(Click,Data)
+Gui.Form.lbl1.Create(Label,"From Date",True,1110,255,0,150,120,True,0,"Arial",8,-2147483633,0)
+Gui.Form.lbl2.Create(Label,"To Date",True,1020,255,0,2370,120,True,0,"Arial",8,-2147483633,0)
+Gui.Form.picGSSLogo.Create(PictureBox)
+Gui.Form.picGSSLogo.Size(4125,1080)
+Gui.Form.picGSSLogo.Position(5160,60)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+V.Local.sError.Declare(String)
+
+'Dawn Hughes 12/22/2017
+
+V.Local..BulkDeclareString(sIcon,sGssLogo)
+
+'GSS Connection
+F.ODBC.Connection!con.OpenConnection(v.Ambient.PDSN,v.Ambient.PUser,v.Ambient.PPass) 
+
+F.Intrinsic.String.Build("{0}\GAB\GAS\gss2.ico",V.Caller.PluginsDir,V.Local.sIcon)
+
+F.Intrinsic.String.Build("{0}\GAB\GAS\GAB_GSS_Logo_Green_Dash.png",V.Caller.PluginsDir,V.Local.sGssLogo)
+gui.Form.picGSSLogo.Picture(V.Local.sGssLogo)
+gui.Form..icon(V.Local.sIcon)
+
+GUI.Form..Show
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4874_Inventory_Dashboard.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	Function.Intrinsic.Control.CallSub(form_unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Main.End
+
+Program.Sub.Data.Start
+F.Intrinsic.Control.SetErrorHandler("Data_Err")
+F.Intrinsic.Control.ClearErrors
+V.Local.sError.Declare(String)
+
+V.Local..BulkDeclareString(ssql, sTo, sFrom, sFilter)
+
+'check if 'D' is open
+F.Intrinsic.Control.If(V.DataTable.D.Exists, =, True)
+	F.Data.DataTable.Close("D")
+F.Intrinsic.Control.EndIf
+
+'Only bring in part numbers that start with :TUB,PIP,SCH,RND,SHT,RCT,SQT,SA,FB
+
+'all dates
+F.Data.DataTable.CreateFromSQL("D", "con", "Select PART, LOCATION, '' As PRODUCT_LINE, '' As  DESCRIPTION, '' As  UM_INVENTORY,'' As  UM_PURCHASING, '' As  FACTOR_CONVERSION, Cast(PART_CREATE_DATE As Date) As PART_CREATE_DATE, '' As ISSUE_UM,'' As CONSUMP_CONV, RTrim(PART)+rTrim(LOCATION) AS PTLC  From V_INVENTORY_MST3 Where SUBSTRING(PART, 1, 3) In ('TUB','PIP','SCH','RND','SHT','RCT','SQT') OR SUBSTRING(PART, 1, 2) In ('SA','FB')", true)
+
+F.Data.DataTable.CreateFromSQL("MSTR", "con", "Select  PRODUCT_LINE, DESCRIPTION, UM_INVENTORY, UM_PURCHASING,FACTOR_CONVERSION,RTrim(PART)+rTrim(LOCATION) AS PTLC  From V_INVENTORY_MSTR", TRUE)
+F.Data.DataView.Create("MSTR", "MSTR_V")
+''' AS  CONSUMP_CONV, '' AS  ISSUE_UM
+F.Data.Dictionary.CreateFromDataView("dict", "MSTR", "MSTR_V", "PTLC", "PRODUCT_LINE")
+F.Data.Dictionary.SetDefaultReturn("dict", "")
+F.Data.DataTable.FillFromDictionary("D", "dict", "PTLC", "PRODUCT_LINE")
+F.Data.Dictionary.Close("dict")
+
+F.Data.Dictionary.CreateFromDataView("dict", "MSTR", "MSTR_V", "PTLC", "DESCRIPTION")
+F.Data.Dictionary.SetDefaultReturn("dict", "")
+F.Data.DataTable.FillFromDictionary("D", "dict", "PTLC", "DESCRIPTION")
+F.Data.Dictionary.Close("dict")
+
+F.Data.Dictionary.CreateFromDataView("dict", "MSTR", "MSTR_V", "PTLC", "UM_INVENTORY")
+F.Data.Dictionary.SetDefaultReturn("dict", "")
+F.Data.DataTable.FillFromDictionary("D", "dict", "PTLC", "UM_INVENTORY")
+F.Data.Dictionary.Close("dict")
+
+F.Data.Dictionary.CreateFromDataView("dict", "MSTR", "MSTR_V", "PTLC", "UM_PURCHASING")
+F.Data.Dictionary.SetDefaultReturn("dict", "")
+F.Data.DataTable.FillFromDictionary("D", "dict", "PTLC", "UM_PURCHASING")
+F.Data.Dictionary.Close("dict")
+
+F.Data.Dictionary.CreateFromDataView("dict", "MSTR", "MSTR_V", "PTLC", "FACTOR_CONVERSION")
+F.Data.Dictionary.SetDefaultReturn("dict", "")
+F.Data.DataTable.FillFromDictionary("D", "dict", "PTLC", "FACTOR_CONVERSION")
+F.Data.Dictionary.Close("dict")
+
+F.Data.DataTable.Close("MSTR")
+
+F.Data.Dictionary.CreateFromSQL("dict", "con", "Select RTrim(PART)+rTrim(LOCATION) AS PTLC,CONSUMP_CONV From V_INVENTORY_MST3")
+F.Data.Dictionary.SetDefaultReturn("dict", "")
+F.Data.DataTable.FillFromDictionary("D", "dict", "PTLC", "CONSUMP_CONV")
+F.Data.Dictionary.Close("dict")
+
+F.Data.Dictionary.CreateFromSQL("dict", "con", "Select RTrim(PART)+rTrim(LOCATION) AS PTLC, ISSUE_UM   From V_INVENTORY_MST2")
+F.Data.Dictionary.SetDefaultReturn("dict", "")
+F.Data.DataTable.FillFromDictionary("D", "dict", "PTLC", "ISSUE_UM")
+F.Data.Dictionary.Close("dict")
+
+'format the date - this is for easy formatting in the grid
+F.Data.DataTable.AddColumn("D", "PART_CREATE_DATE2", "Date")
+F.Data.Dictionary.CreateFromSQL("dict", "con", "Select RTrim(PART)+rTrim(LOCATION) AS PTLC, cast(PART_CREATE_DATE as Date) As  PART_CREATE_DATE2  From V_INVENTORY_MST3")
+F.Data.Dictionary.SetDefaultReturn("dict", "1/1/1900")
+F.Data.DataTable.FillFromDictionary("D", "dict", "PTLC", "PART_CREATE_DATE2")
+F.Data.Dictionary.Close("dict")
+
+'select only where Product_Line = 01
+F.Data.DataView.Create("D", "D_V", 22, "PRODUCT_LINE = '01'", "" )
+'if we need to filter the dates
+F.Intrinsic.Control.If(V.Screen.Form!chk1.Value, = , 0)
+	F.Intrinsic.String.Build("(PART_CREATE_DATE > ='{0}' And PART_CREATE_DATE < ='{1}')  OR  (ISSUE_UM = '') OR  (UM_INVENTORY = '') OR (UM_PURCHASING = '')", V.Screen.Form!dtpFrom.Value,  V.Screen.Form!dtpTo.Value, V.local.sFilter)
+	F.Data.DataView.SetFilter("D", "D_V", V.local.sFilter )
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.CallSub(Grid)
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("Data_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4874_Inventory_Dashboard.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	Function.Intrinsic.Control.CallSub(form_unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Data.End
+
+Program.Sub.Grid.Start
+F.Intrinsic.Control.SetErrorHandler("Grid_Err")
+F.Intrinsic.Control.ClearErrors
+V.Local.sError.Declare(String)
+
+V.Local..BulkDeclareString(sValues)
+
+GUI.Form.GsGrid.AddGridViewFromDataview("Grid", "D", "D_V")
+
+'remove columns from grid
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PTLC", "Visible", False)
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART_CREATE_DATE", "Visible", False)
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PRODUCT_LINE", "Visible", False)
+
+'date display
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART_CREATE_DATE2", "DisplayFormatType", "b")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART_CREATE_DATE2", "DisplayCustomDatetime", "d")
+
+'numeric display
+GUI.Form.GsGrid.SetColumnProperty("Grid", "CONSUMP_CONV", "DisplayFormatType", "a")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "CONSUMP_CONV", "DisplayCustomNumeric", "######.00000")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "FACTOR_CONVERSION", "DisplayFormatType", "a")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "FACTOR_CONVERSION", "DisplayCustomNumeric", "######.00000")
+
+''''set width header
+'''GUI.Form.GsGrid.SetColumnProperty("Grid", "BATCH", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "LOCATION", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "DESCRIPTION", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "UM_INVENTORY", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "UM_PURCHASING", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "ISSUE_UM", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "FACTOR_CONVERSION", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "CONSUMP_CONV", "MinWidth", "100")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART_CREATE_DATE2", "MinWidth", "100")
+
+''''caption
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART", "Caption", "Part Number")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "LOCATION", "Caption", "Location")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "DESCRIPTION", "Caption", "Part Description")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "UM_INVENTORY", "Caption", "Inv UM")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "UM_PURCHASING", "Caption", "PO UM")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "ISSUE_UM", "Caption", "Est/Issue UM")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "FACTOR_CONVERSION", "Caption", "Purch Conv Factor")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "CONSUMP_CONV", "Caption", "Consumption Con Factor")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART_CREATE_DATE2", "Caption", "Date Created")
+
+'make drop down lists
+'get values for drop down list
+'F.Odbc.Connection!con.ExecuteAndReturn("SELECT CODE+'   '+DESCR FROM UM_CODES Order By CODE", V.Local.sValues)
+F.Odbc.Connection!con.ExecuteAndReturn("SELECT CODE FROM UM_CODES Order By CODE", V.Local.sValues)
+F.Intrinsic.String.Replace(V.Local.sValues, "#$#", "*!*", V.Local.sValues)
+Gui.Form.GsGrid.ColumnEdit("Grid", "UM_INVENTORY", "Dropdownlist", V.Local.sValues)
+Gui.Form.GsGrid.ColumnEdit("Grid", "UM_PURCHASING", "Dropdownlist", V.Local.sValues)
+Gui.Form.GsGrid.ColumnEdit("Grid", "ISSUE_UM", "Dropdownlist", V.Local.sValues)
+
+'order
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART", "VisibleIndex", "0")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "LOCATION", "VisibleIndex", "1")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "DESCRIPTION", "VisibleIndex", "2")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "UM_INVENTORY", "VisibleIndex", "3")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "UM_PURCHASING", "VisibleIndex", "4")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "ISSUE_UM", "VisibleIndex", "5")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "FACTOR_CONVERSION", "VisibleIndex", "6")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "CONSUMP_CONV", "VisibleIndex", "7")
+GUI.Form.GsGrid.SetColumnProperty("Grid", "PART_CREATE_DATE2", "VisibleIndex", "8")
+
+'read only and allow edits
+Gui.Form.GsGrid.SetColumnProperty("Grid", "PART","ReadOnly", True)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "PART","AllowEdit", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "LOCATION","ReadOnly", True)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "LOCATION","AllowEdit", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "DESCRIPTION","ReadOnly", True)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "DESCRIPTION","AllowEdit", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "PART_CREATE_DATE2","ReadOnly", True)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "PART_CREATE_DATE2","AllowEdit", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "UM_INVENTORY","ReadOnly", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "UM_INVENTORY","AllowEdit", True)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "UM_PURCHASING","ReadOnly", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "UM_PURCHASING","AllowEdit", True)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "ISSUE_UM","ReadOnly", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "ISSUE_UM","AllowEdit", True)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "FACTOR_CONVERSION","ReadOnly", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "FACTOR_CONVERSION","AllowEdit", True)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "CONSUMP_CONV","ReadOnly", False)
+Gui.Form.GsGrid.SetColumnProperty("Grid", "CONSUMP_CONV","AllowEdit", True)
+
+
+
+''''debt and credit right justify
+'''GUI.Form.GsGrid.SetColumnProperty("Grid", "Debt", "CellHAlignment", "far")
+'''GUI.Form.GsGrid.SetColumnProperty("Grid", "Credit", "CellHAlignment", "far")
+
+''''center header
+'''GUI.Form.GsGrid.SetColumnProperty("Grid", "Dates", "HeaderHAlignment", "center")
+
+
+
+
+Gui.Form.GsGrid.SetGridViewProperty("Grid", "Enableappearanceoddrow", True)
+Gui.Form.GsGrid.Anchor(15)
+GUI.Form.GsGrid.MainView("Grid")
+GUI.Form..Show
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("Grid_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4874_Inventory_Dashboard.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	Function.Intrinsic.Control.CallSub(form_unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Grid.End
+
+Program.Sub.cmdSave_Click.Start
+F.Intrinsic.Control.SetErrorHandler("cmdSave_Click_Err")
+F.Intrinsic.Control.ClearErrors
+V.Local.sError.Declare(String)
+
+'this will save back to database
+'inventory master
+F.Data.DataTable.SaveToDB("D", "con", "INVENTORY_MSTR", "PART*!*LOCATION", 256, "PART@!@PART*!*LOCATION@!@LOCATION*!*UM_INVENTORY@!@UM_INVENTORY*!*UM_PURCHASING@!@UM_PURCHASING*!*FACTOR_CONVERSION@!@FACTOR_CONVERSION")
+'inventory mstr2
+F.Data.DataTable.SaveToDB("D", "con", "INVENTORY_MST2", "PART*!*LOCATION", 256, "PART@!@PART*!*LOCATION@!@LOCATION*!*ISSUE_UM  @!@ISSUE_UM")
+'inventory mstr3
+F.Data.DataTable.SaveToDB("D", "con", "INVENTORY_MST3", "PART*!*LOCATION", 256, "PART@!@PART*!*LOCATION@!@LOCATION*!*CONSUMP_CONV@!@CONSUMP_CONV")
+
+F.Intrinsic.UI.Msgbox("Data Saved")
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("cmdSave_Click_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4874_Inventory_Dashboard.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	Function.Intrinsic.Control.CallSub(form_unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.cmdSave_Click.End
+
+Program.Sub.GsGrid_CellValueChanged.Start
+F.Intrinsic.Control.SetErrorHandler("GsGrid_CellValueChanged_Err")
+F.Intrinsic.Control.ClearErrors
+V.Local.sError.Declare(String)
+
+V.Local.bNum.Declare(Boolean)
+
+F.Intrinsic.Control.If(V.Args.Column, =,"FACTOR_CONVERSION")
+	Function.Intrinsic.Math.IsNumeric(V.Args.Value, V.Local.bNum)
+	F.Intrinsic.Control.If(V.Local.bNum, =, False)
+		F.Intrinsic.UI.Msgbox("Needs to be Numeric")
+		F.Data.DataTable.SetValue("D", V.Args.RowIndex, "FACTOR_CONVERSION", 0.00000)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.ElseIf(V.Args.Column, =,"CONSUMP_CONV")
+	Function.Intrinsic.Math.IsNumeric(V.Args.Value, V.Local.bNum)
+	F.Intrinsic.Control.If(V.Local.bNum, =, False)
+		F.Intrinsic.UI.Msgbox("Needs to be Numeric")
+		F.Data.DataTable.SetValue("D", V.Args.RowIndex, "CONSUMP_CONV", 0.00000)
+	F.Intrinsic.Control.EndIf		
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("GsGrid_CellValueChanged_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4874_Inventory_Dashboard.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	Function.Intrinsic.Control.CallSub(form_unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.GsGrid_CellValueChanged.End
+
+Program.Sub.Form_UnLoad.Start
+F.Intrinsic.Control.SetErrorHandler("Form_UnLoad_Err")
+F.Intrinsic.Control.ClearErrors
+V.Local.sError.Declare(String)
+
+GUI.Form..Visible(False)
+'close connection to the database
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("Form_UnLoad_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4874_Inventory_Dashboard.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	Function.Intrinsic.Control.End
+
+Function.Intrinsic.Control.EndIf
+Program.Sub.Form_UnLoad.End
+
+Program.Sub.Comments.Start
+${$0$}$$}$DH1$}$12/15/2017 11:20:17 AM$}$False
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$This project will create an Inventory Dashboard that will allow for Unit of Measure and Conversion Factors to be updated.
+Program.Sub.Comments.End
